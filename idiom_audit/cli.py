@@ -58,18 +58,26 @@ def cmd_cheap_baselines(args: argparse.Namespace) -> None:
 
 
 def _paired_scramble_long(originals: pd.DataFrame, scrambles: pd.DataFrame) -> pd.DataFrame:
+    if "scramble_type" not in scrambles.columns:
+        scrambles = scrambles.copy()
+        scrambles["scramble_type"] = "full"
     rows = []
     for target in sorted(originals["compartment_target"].dropna().unique()):
         score_col = target_score_column(target, originals)
-        original_scores = originals.set_index("sequence_id")[score_col]
+        original_scores = (
+            originals[originals["compartment_target"] == target]
+            .drop_duplicates("sequence_id")
+            .set_index("sequence_id")[score_col]
+        )
         sub = scrambles[scrambles["compartment_target"] == target]
-        for row in sub.itertuples(index=False):
-            row_dict = row._asdict()
+        for _, row in sub.iterrows():
+            row_dict = row.to_dict()
             original_score = original_scores.get(row_dict["original_sequence_id"])
             if pd.notna(original_score) and pd.notna(row_dict.get(score_col)):
                 rows.append(
                     {
                         "compartment_target": target,
+                        "scramble_type": row_dict.get("scramble_type", "full"),
                         "original_sequence_id": row_dict["original_sequence_id"],
                         "original_score": original_score,
                         "scramble_score": row_dict[score_col],
@@ -84,10 +92,22 @@ def cmd_test1(args: argparse.Namespace) -> None:
     out_dir = Path(args.out_dir)
     originals = read_scores(args.originals)
     scrambles = read_scores(args.scrambles)
+    if "scramble_type" not in scrambles.columns:
+        scrambles = scrambles.copy()
+        scrambles["scramble_type"] = "full"
     rows = []
     for target in sorted(originals["compartment_target"].dropna().unique()):
         col = target_score_column(target, originals)
-        rows.append(paired_scramble_stats(originals[originals["compartment_target"] == target], scrambles, target, col))
+        for scramble_type in sorted(scrambles["scramble_type"].dropna().unique()):
+            rows.append(
+                paired_scramble_stats(
+                    originals[originals["compartment_target"] == target],
+                    scrambles,
+                    target,
+                    col,
+                    scramble_type=scramble_type,
+                )
+            )
     stats = pd.DataFrame(rows)
     save_csv(stats, out_dir / "composition_matched_scramble_stats.csv")
     paired = _paired_scramble_long(originals, scrambles)

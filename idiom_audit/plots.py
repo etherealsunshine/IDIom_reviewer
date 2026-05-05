@@ -20,7 +20,16 @@ def _save(path: str | Path) -> None:
 
 
 def plot_scramble_scatter(paired_df: pd.DataFrame, out_path: str | Path) -> None:
-    g = sns.FacetGrid(paired_df, col="compartment_target", col_wrap=2, height=4, sharex=False, sharey=False)
+    row = "scramble_type" if "scramble_type" in paired_df.columns and paired_df["scramble_type"].nunique() > 1 else None
+    g = sns.FacetGrid(
+        paired_df,
+        row=row,
+        col="compartment_target",
+        col_wrap=None if row else 2,
+        height=4,
+        sharex=False,
+        sharey=False,
+    )
     g.map_dataframe(sns.scatterplot, x="original_score", y="scramble_score", alpha=0.25, s=14)
     for ax in g.axes.flat:
         lo = min(ax.get_xlim()[0], ax.get_ylim()[0])

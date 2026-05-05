@@ -83,6 +83,26 @@ one-time model asset setup was built around a persistent Modal Volume named
 `idiom-protgps-models`, and downloads only the ProtGPS checkpoint plus the small
 ESM2 assets needed by the reward model.
 
+To download the Test 1 generated FASTAs into a separate persistent Modal Volume
+named `idiom-audit-data`:
+
+```bash
+UV_CACHE_DIR=.uv-cache uv run modal run tools/modal/download_test1_fastas.py --action inspect
+UV_CACHE_DIR=.uv-cache uv run modal run tools/modal/download_test1_fastas.py --action download
+UV_CACHE_DIR=.uv-cache uv run modal run tools/modal/download_test1_fastas.py --action layout
+```
+
+The downloaded files live under `/audit_data` inside Modal:
+
+```text
+/audit_data/idr_datasets/generated_sequences/generated_idps/generated_idrs.fasta
+/audit_data/idr_datasets/generated_sequences/generated_idps/generated_full.fasta
+/audit_data/idr_datasets/generated_sequences/generated_protgps/generated_nucleolus/generated_idrs.fasta
+/audit_data/idr_datasets/generated_sequences/generated_protgps/generated_chromosome/generated_idrs.fasta
+/audit_data/idr_datasets/generated_sequences/generated_protgps/generated_p-body/generated_idrs.fasta
+/audit_data/idr_datasets/generated_sequences/generated_protgps/generated_stress_granule/generated_idrs.fasta
+```
+
 Small smoke run:
 
 ```bash
@@ -108,6 +128,34 @@ UV_CACHE_DIR=.uv-cache uv run modal run tools/modal/protgps_score_csv.py \
 The Modal function currently allows up to 4 L40S containers via `max_containers=4`.
 Increase that in `tools/modal/protgps_score_csv.py` only after a pilot confirms
 cost and throughput look sane.
+
+For a longer unattended Test 1 pilot that prepares originals/scrambles from the
+Modal FASTA Volume, scores them, downloads the score CSVs, and runs the local
+Test 1 analysis:
+
+```bash
+tmux new -s idiom-test1
+bash tools/workflows/run_modal_test1_pilot.sh 2>&1 | tee logs/test1_pilot_1k.log
+```
+
+By default this makes `3` full composition scrambles and `3` block scrambles
+per RL sequence. Block scrambles cut sequences into 10-20 residue chunks and
+shuffle those chunks, preserving local motifs while disrupting longer-range
+arrangement.
+
+Override limits if desired:
+
+```bash
+RUN_NAME=test1_pilot_2k BASE_LIMIT=2000 RL_LIMIT_PER_TARGET=2000 BATCH_SIZE=64 \
+  bash tools/workflows/run_modal_test1_pilot.sh 2>&1 | tee logs/test1_pilot_2k.log
+```
+
+Override scramble depth:
+
+```bash
+SCRAMBLES_PER_TYPE=2 RUN_NAME=test1_pilot_1k_s2 \
+  bash tools/workflows/run_modal_test1_pilot.sh 2>&1 | tee logs/test1_pilot_1k_s2.log
+```
 
 ### Local Scoring
 

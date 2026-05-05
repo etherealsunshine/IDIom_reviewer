@@ -15,9 +15,12 @@ def paired_scramble_stats(
     scrambles: pd.DataFrame,
     target: str,
     score_col: str,
+    scramble_type: str | None = None,
 ) -> dict[str, float | str | int]:
-    original_scores = originals.set_index("sequence_id")[score_col]
+    original_scores = originals.drop_duplicates("sequence_id").set_index("sequence_id")[score_col]
     scr = scrambles[scrambles["compartment_target"] == target].copy()
+    if scramble_type is not None and "scramble_type" in scr.columns:
+        scr = scr[scr["scramble_type"] == scramble_type].copy()
     paired = scr.join(original_scores.rename("original_score"), on="original_sequence_id")
     paired = paired.dropna(subset=["original_score", score_col])
     scramble_mean = paired.groupby("original_sequence_id")[score_col].mean()
@@ -30,6 +33,7 @@ def paired_scramble_stats(
         p_value = np.nan
     return {
         "target": target,
+        "scramble_type": scramble_type or "all",
         "n": int(len(common_original)),
         "original_mean": float(common_original.mean()),
         "original_std": float(common_original.std()),
