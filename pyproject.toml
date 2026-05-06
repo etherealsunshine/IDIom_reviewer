@@ -2,6 +2,7 @@
 name = "idiom-rl-audit"
 version = "0.1.0"
 description = "Audit scripts for IDiom RL post-training and ProtGPS reward sensitivity."
+readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
   "numpy>=1.24",

@@ -1,0 +1,3 @@
+[submodule "idiom_repo"]
+	path = idiom_repo
+	url = https://github.com/rotskoff-group/idiom

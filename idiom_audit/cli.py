@@ -6,6 +6,8 @@ from pathlib import Path
 import pandas as pd
 
 from .constants import DEFAULT_SEED, TARGET_COMPARTMENTS
+from .baselines import generate_amended_baselines
+from .deeploc import basic_summary, pair_classifier, read_deeploc_outputs, sorting_signal_summary
 from .datasets import load_fasta_table, make_scrambles, write_scoring_fasta
 from .features import featurize_frame
 from .scoring_io import read_scores, save_csv, score_columns, target_score_column
@@ -55,6 +57,127 @@ def cmd_cheap_baselines(args: argparse.Namespace) -> None:
     save_csv(df, args.output)
     if args.fasta_output:
         write_scoring_fasta(df, args.fasta_output)
+
+
+def cmd_amended_baselines(args: argparse.Namespace) -> None:
+    originals = read_scores(args.originals)
+    baselines, motif_summary = generate_amended_baselines(
+        originals,
+        n_per_target=args.n_per_target,
+        seed=args.seed,
+    )
+    save_csv(baselines, args.output)
+    save_csv(motif_summary, args.motif_summary_output)
+    if args.fasta_output:
+        write_scoring_fasta(baselines, args.fasta_output)
+
+
+def _condition_label(df: pd.DataFrame) -> pd.Series:
+    source = df["source"].astype(str)
+    condition = pd.Series(source, index=df.index, dtype="object")
+    condition[source.eq("base_idp")] = "Base IDPs"
+    condition[source.str.startswith("rl_")] = "RL original"
+    if "scramble_type" in df.columns:
+        condition[df["scramble_type"].astype(str).eq("block")] = "RL block-shuffled"
+        condition[df["scramble_type"].astype(str).eq("full")] = "RL fully scrambled"
+    condition[source.str.startswith("comp_random_")] = "Composition-matched random"
+    condition[source.str.startswith("motif_calibrated_")] = "Motif-calibrated random"
+    condition[source.eq("pbody_aromatic_spaced")] = "P-body aromatic-spaced"
+    condition[source.str.contains("disprot", case=False, na=False)] = "DisProt natural"
+    return condition
+
+
+def cmd_amended_baseline_compare(args: argparse.Namespace) -> None:
+    from .plots import plot_target_condition_box
+
+    out_dir = Path(args.out_dir)
+    frames = []
+    for path in args.scores:
+        frames.append(read_scores(path))
+    df = pd.concat(frames, ignore_index=True, sort=False)
+    df["condition"] = _condition_label(df)
+
+    rows = []
+    for target in TARGET_COMPARTMENTS:
+        try:
+            score_col = target_score_column(target, df)
+        except KeyError:
+            continue
+        sub = df[df["compartment_target"].eq(target) | df["source"].eq("base_idp")].copy()
+        for condition, group in sub.groupby("condition", dropna=False):
+            vals = group[score_col].dropna()
+            if vals.empty:
+                continue
+            rows.append(
+                {
+                    "target": target,
+                    "condition": condition,
+                    "n": len(vals),
+                    "mean": float(vals.mean()),
+                    "std": float(vals.std()),
+                    "median": float(vals.median()),
+                    "p25": float(vals.quantile(0.25)),
+                    "p75": float(vals.quantile(0.75)),
+                }
+            )
+        plot_target_condition_box(sub, target, "condition", out_dir / f"amended_baseline_box_{target}.png")
+
+    summary = pd.DataFrame(rows)
+    rl_means = summary[summary["condition"].eq("RL original")][["target", "mean"]].rename(columns={"mean": "rl_mean"})
+    summary = summary.merge(rl_means, on="target", how="left")
+    summary["gap_vs_rl"] = summary["rl_mean"] - summary["mean"]
+    summary["threshold_call"] = ""
+    trivial = summary["condition"].isin(["Composition-matched random", "Motif-calibrated random", "P-body aromatic-spaced"])
+    summary.loc[trivial & summary["gap_vs_rl"].le(0.05), "threshold_call"] = "within_0.05_trivial_baseline"
+    summary.loc[trivial & summary["gap_vs_rl"].gt(0.15), "threshold_call"] = "gap_gt_0.15_nontrivial"
+    summary.loc[trivial & summary["gap_vs_rl"].gt(0.05) & summary["gap_vs_rl"].le(0.15), "threshold_call"] = "ambiguous"
+    save_csv(summary, out_dir / "amended_baseline_summary.csv")
+
+
+def cmd_deeploc_analyze(args: argparse.Namespace) -> None:
+    from .plots import plot_confusion_matrix, plot_deeploc_barplot
+
+    out_dir = Path(args.out_dir)
+    df = read_deeploc_outputs(args.results_dir)
+    save_csv(df, out_dir / "deeploc_all_predictions.csv")
+
+    summary = basic_summary(df)
+    save_csv(summary, out_dir / "deeploc_summary_table.csv")
+    plot_deeploc_barplot(summary, out_dir / "deeploc_barplot.png")
+
+    signals = sorting_signal_summary(df)
+    save_csv(signals, out_dir / "deeploc_sorting_signals_summary.csv")
+
+    pairs = [
+        ("rl_p-body", "rl_stress_granule", "pbody", "stress_granule", "deeploc_pbody_sg_confusion.png", "deeploc_pbody_vs_sg_classifier_accuracy.txt"),
+        ("rl_nucleolus", "rl_chromosome", "nucleolus", "chromosome", "deeploc_nucleolus_chromosome_confusion.png", "deeploc_nucleolus_vs_chromosome_classifier_accuracy.txt"),
+    ]
+    rows = []
+    for source_a, source_b, label_a, label_b, png_name, txt_name in pairs:
+        try:
+            result = pair_classifier(df, source_a, source_b, label_a, label_b)
+        except ValueError as exc:
+            (out_dir / txt_name).parent.mkdir(parents=True, exist_ok=True)
+            (out_dir / txt_name).write_text(str(exc) + "\n")
+            continue
+        rows.append({k: v for k, v in result.items() if k != "confusion_matrix"})
+        plot_confusion_matrix(result["confusion_matrix"], [label_a, label_b], out_dir / png_name)
+        (out_dir / txt_name).parent.mkdir(parents=True, exist_ok=True)
+        (out_dir / txt_name).write_text(
+            "\n".join(
+                [
+                    f"source_a={source_a}",
+                    f"source_b={source_b}",
+                    f"accuracy={result['accuracy']:.4f}",
+                    f"auc={result['auc']:.4f}",
+                    f"euclidean_mean_vector_distance={result['euclidean_mean_vector_distance']:.6f}",
+                    f"confusion_matrix={result['confusion_matrix'].tolist()}",
+                ]
+            )
+            + "\n"
+        )
+    if rows:
+        save_csv(pd.DataFrame(rows), out_dir / "deeploc_pair_classifier_summary.csv")
 
 
 def _paired_scramble_long(originals: pd.DataFrame, scrambles: pd.DataFrame) -> pd.DataFrame:
@@ -191,6 +314,25 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--length", type=int, default=100)
     p.add_argument("--seed", type=int, default=DEFAULT_SEED)
     p.set_defaults(func=cmd_cheap_baselines)
+
+    p = sub.add_parser("amended-baselines")
+    p.add_argument("--originals", required=True)
+    p.add_argument("--output", required=True)
+    p.add_argument("--motif-summary-output", required=True)
+    p.add_argument("--fasta-output")
+    p.add_argument("--n-per-target", type=int, default=1000)
+    p.add_argument("--seed", type=int, default=DEFAULT_SEED)
+    p.set_defaults(func=cmd_amended_baselines)
+
+    p = sub.add_parser("amended-baseline-compare")
+    p.add_argument("--scores", nargs="+", required=True)
+    p.add_argument("--out-dir", default="results/amended_baselines")
+    p.set_defaults(func=cmd_amended_baseline_compare)
+
+    p = sub.add_parser("deeploc-analyze")
+    p.add_argument("--results-dir", required=True)
+    p.add_argument("--out-dir", default="results/deeploc_validation")
+    p.set_defaults(func=cmd_deeploc_analyze)
 
     p = sub.add_parser("write-scoring-fasta")
     p.add_argument("--input", required=True)

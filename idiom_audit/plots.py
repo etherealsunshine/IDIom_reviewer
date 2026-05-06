@@ -102,3 +102,35 @@ def plot_mean_score_radarish(df: pd.DataFrame, out_path: str | Path) -> None:
     sns.barplot(data=means, x="compartment", y="mean_score", hue="source")
     plt.xticks(rotation=45, ha="right")
     _save(out_path)
+
+
+def plot_target_condition_box(df: pd.DataFrame, target: str, condition_col: str, out_path: str | Path) -> None:
+    col = target_score_column(target, df)
+    sub = df[df["compartment_target"] == target].copy()
+    if sub.empty:
+        return
+    plt.figure(figsize=(13, 5))
+    sns.boxplot(data=sub, x=condition_col, y=col, showfliers=False)
+    sample = sub.sample(min(len(sub), 4000), random_state=33402)
+    sns.stripplot(data=sample, x=condition_col, y=col, color="0.2", alpha=0.12, size=1.8)
+    plt.xticks(rotation=35, ha="right")
+    plt.ylabel(f"ProtGPS {target}")
+    _save(out_path)
+
+
+def plot_deeploc_barplot(summary: pd.DataFrame, out_path: str | Path) -> None:
+    class_cols = [c for c in summary.columns if c.startswith("mean_")]
+    plot_df = summary.melt(id_vars="source", value_vars=class_cols, var_name="class", value_name="mean_probability")
+    plot_df["class"] = plot_df["class"].str.replace("mean_", "", regex=False)
+    plt.figure(figsize=(14, 6))
+    sns.barplot(data=plot_df, x="class", y="mean_probability", hue="source")
+    plt.xticks(rotation=45, ha="right")
+    _save(out_path)
+
+
+def plot_confusion_matrix(cm, labels: list[str], out_path: str | Path) -> None:
+    plt.figure(figsize=(4.5, 4))
+    sns.heatmap(cm, annot=True, fmt="d", cmap="Blues", xticklabels=labels, yticklabels=labels)
+    plt.xlabel("Predicted")
+    plt.ylabel("True")
+    _save(out_path)

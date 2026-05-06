@@ -36,10 +36,10 @@ hf download jxliu2/idiom-datasets \
 Likely generated FASTA paths in the dataset, based on the cloned repo:
 
 ```text
-datasets/idr_datasets/generated_sequences/generated_idps/generated_full.fasta
-datasets/idr_datasets/generated_sequences/generated_idrs/generated_full.fasta
-datasets/idr_datasets/generated_sequences/generated_protgps/generated_chromosome/generated_full.fasta
-datasets/idr_datasets/generated_sequences/generated_protgps/generated_nucleolus/generated_full.fasta
-datasets/idr_datasets/generated_sequences/generated_protgps/generated_p-body/generated_full.fasta
-datasets/idr_datasets/generated_sequences/generated_protgps/generated_stress_granule/generated_full.fasta
+datasets/idr_datasets/generated_sequences/generated_idps/generated_idrs.fasta
+datasets/idr_datasets/generated_sequences/generated_idrs/generated_idrs.fasta
+datasets/idr_datasets/generated_sequences/generated_protgps/generated_chromosome/generated_idrs.fasta
+datasets/idr_datasets/generated_sequences/generated_protgps/generated_nucleolus/generated_idrs.fasta
+datasets/idr_datasets/generated_sequences/generated_protgps/generated_p-body/generated_idrs.fasta
+datasets/idr_datasets/generated_sequences/generated_protgps/generated_stress_granule/generated_idrs.fasta
 ```

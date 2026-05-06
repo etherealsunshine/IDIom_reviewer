@@ -49,9 +49,12 @@ def specificity(df: pd.DataFrame, target_col: str = "compartment_target") -> pd.
     cols = score_columns(df)
     out = df.copy()
     values = []
-    for row in out.itertuples(index=False):
-        row_dict = row._asdict()
+    for _, row in out.iterrows():
+        row_dict = row.to_dict()
         target = row_dict.get(target_col)
+        if pd.isna(target):
+            values.append(np.nan)
+            continue
         target_score_name = f"protgps_{target}"
         if target_score_name not in cols and target == "p_body":
             target_score_name = "protgps_p-body"

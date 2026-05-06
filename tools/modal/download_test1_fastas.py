@@ -68,6 +68,21 @@ def layout_smoke() -> dict:
     timeout=10 * 60,
     volumes={DATA_ROOT: data_volume},
 )
+def list_dataset_repo() -> dict:
+    from huggingface_hub import list_repo_files
+
+    files = list_repo_files("jxliu2/idiom-datasets", repo_type="dataset")
+    return {
+        "n_files": len(files),
+        "files": files,
+    }
+
+
+@app.function(
+    image=image,
+    timeout=10 * 60,
+    volumes={DATA_ROOT: data_volume},
+)
 def inspect_dataset_repo() -> dict:
     from huggingface_hub import list_repo_files
 
@@ -111,9 +126,11 @@ def download_test1_fastas() -> dict:
 def main(action: str = "layout"):
     if action == "layout":
         print(layout_smoke.remote())
+    elif action == "list":
+        print(list_dataset_repo.remote())
     elif action == "inspect":
         print(inspect_dataset_repo.remote())
     elif action == "download":
         print(download_test1_fastas.remote())
     else:
-        raise ValueError("action must be one of: layout, inspect, download")
+        raise ValueError("action must be one of: layout, list, inspect, download")

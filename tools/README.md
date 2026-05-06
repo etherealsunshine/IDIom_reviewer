@@ -41,3 +41,29 @@ bash tools/workflows/run_modal_test1_pilot.sh 2>&1 | tee logs/test1_pilot_1k.log
 The Test 1 pilot creates both full amino-acid scrambles and block scrambles.
 Use `SCRAMBLES_PER_TYPE=2` or `3` to control how many replicates of each type are
 generated per RL sequence.
+
+Amended cheap-baseline probe:
+
+```bash
+bash tools/workflows/run_amended_baseline_probe.sh 2>&1 | tee logs/amended_baseline_test1_pilot_1k.log
+```
+
+Full Test 2 RandomForest probe:
+
+```bash
+bash tools/workflows/run_test2_random_forest.sh 2>&1 | tee logs/test2_random_forest_full.log
+```
+
+DeepLoc validation:
+
+```bash
+bash tools/workflows/run_deeploc_validation.sh 2>&1 | tee logs/deeploc_pilot_2k.log
+```
+
+If the official DeepLoc package has not been uploaded to the Modal cache Volume
+yet, run:
+
+```bash
+DEEPLOC_PACKAGE=/path/to/deeploc-2.1.All.tar.gz INSTALL_SMOKE_ONLY=1 \
+  bash tools/workflows/run_deeploc_validation.sh
+```

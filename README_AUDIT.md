@@ -26,7 +26,7 @@ their resulting score CSVs can be folded into the same plotting/statistics layer
 
 ## Install
 
-From `/Users/utkarsh/IDIom`:
+From the repository root:
 
 ```bash
 uv sync
@@ -43,12 +43,12 @@ UV_CACHE_DIR=.uv-cache uv run idiom-audit --help
 Expected local files after later HuggingFace downloads:
 
 ```text
-idiom_repo/datasets/idr_datasets/generated_sequences/generated_idps/generated_full.fasta
-idiom_repo/datasets/idr_datasets/generated_sequences/generated_idrs/generated_full.fasta
-idiom_repo/datasets/idr_datasets/generated_sequences/generated_protgps/generated_nucleolus/generated_full.fasta
-idiom_repo/datasets/idr_datasets/generated_sequences/generated_protgps/generated_chromosome/generated_full.fasta
-idiom_repo/datasets/idr_datasets/generated_sequences/generated_protgps/generated_p-body/generated_full.fasta
-idiom_repo/datasets/idr_datasets/generated_sequences/generated_protgps/generated_stress_granule/generated_full.fasta
+idiom_repo/datasets/idr_datasets/generated_sequences/generated_idps/generated_idrs.fasta
+idiom_repo/datasets/idr_datasets/generated_sequences/generated_idrs/generated_idrs.fasta
+idiom_repo/datasets/idr_datasets/generated_sequences/generated_protgps/generated_nucleolus/generated_idrs.fasta
+idiom_repo/datasets/idr_datasets/generated_sequences/generated_protgps/generated_chromosome/generated_idrs.fasta
+idiom_repo/datasets/idr_datasets/generated_sequences/generated_protgps/generated_p-body/generated_idrs.fasta
+idiom_repo/datasets/idr_datasets/generated_sequences/generated_protgps/generated_stress_granule/generated_idrs.fasta
 idiom_repo/datasets/idr_datasets/training_sequences/AFDB_IDR_90_FIM_512_idrs.fasta
 ```
 
@@ -156,6 +156,63 @@ Override scramble depth:
 SCRAMBLES_PER_TYPE=2 RUN_NAME=test1_pilot_1k_s2 \
   bash tools/workflows/run_modal_test1_pilot.sh 2>&1 | tee logs/test1_pilot_1k_s2.log
 ```
+
+After Test 1 finishes, run the amended cheap-baseline probe:
+
+```bash
+bash tools/workflows/run_amended_baseline_probe.sh 2>&1 | tee logs/amended_baseline_test1_pilot_1k.log
+```
+
+This adds composition-matched random baselines, motif-density-calibrated random
+baselines, and the P-body aromatic-spaced baseline. It compares them against
+base IDPs, RL originals, full scrambles, and block scrambles. The decision
+threshold is recorded in `amended_baseline_summary.csv`: within `0.05` of the RL
+mean means a trivial baseline is effectively matching RL; a gap greater than
+`0.15` means RL is meaningfully above that trivial construction; between those
+is ambiguous.
+
+Full RandomForest shallow-feature probe:
+
+```bash
+tmux new -s idiom-test2-rf
+cd /path/to/IDIom
+bash tools/workflows/run_test2_random_forest.sh 2>&1 | tee logs/test2_random_forest_full.log
+```
+
+This downloads/uses the packaged DisProt, CATH S60, generated IDP/RL FASTAs, and
+a 10K reservoir subsample of the large AFDB training IDR FASTA in the Modal data
+Volume, scores the pool with ProtGPS, featurizes locally, and trains the
+`RandomForestRegressor(n_estimators=500, max_depth=15)` probes.
+The feature set includes the original shallow features plus motif densities,
+basic-cluster max length, aromatic/RGG/SP-TP spacing statistics, and aromatic
+evenness.
+
+Smaller smoke:
+
+```bash
+RUN_NAME=test2_smoke BASE_LIMIT=500 RL_LIMIT_PER_TARGET=500 TRAINING_LIMIT=500 \
+  bash tools/workflows/run_test2_random_forest.sh 2>&1 | tee logs/test2_smoke.log
+```
+
+DeepLoc independent validation:
+
+```bash
+tmux new -s idiom-deeploc
+cd /path/to/IDIom
+bash tools/workflows/run_deeploc_validation.sh 2>&1 | tee logs/deeploc_pilot_2k.log
+```
+
+If the DeepLoc package is not already cached in the `idiom-deeploc-cache` Modal
+Volume, upload and smoke-test the official DTU package first:
+
+```bash
+DEEPLOC_PACKAGE=/path/to/deeploc-2.1.All.tar.gz INSTALL_SMOKE_ONLY=1 \
+  bash tools/workflows/run_deeploc_validation.sh
+```
+
+This runs DeepLoc 2.x Fast on 2K sequences per generated source plus all packaged
+DisProt IDRs, then tests whether DeepLoc's 10 broad localization probabilities
+distinguish RL P-body from RL stress-granule and RL nucleolus from RL chromosome.
 
 ### Local Scoring
 

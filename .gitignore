@@ -8,9 +8,21 @@ __pycache__/
 .ruff_cache/
 .DS_Store
 
+logs/
 results/
 data/raw/
 data/processed/
+
+*.tar.gz
+*.tgz
+*.zip
+*.pdf
+*.ckpt
+*.pt
+*.pth
+*.safetensors
+models/
+datasets/
 
 idiom_repo/models/
 idiom_repo/datasets/idr_datasets/

@@ -8,6 +8,8 @@ SCRAMBLES_PER_TYPE="${SCRAMBLES_PER_TYPE:-3}"
 BATCH_SIZE="${BATCH_SIZE:-64}"
 SEED="${SEED:-33402}"
 UV_CACHE_DIR="${UV_CACHE_DIR:-.uv-cache}"
+MPLCONFIGDIR="${MPLCONFIGDIR:-${TMPDIR:-/tmp}/idiom_mpl}"
+export MPLCONFIGDIR
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$ROOT_DIR"

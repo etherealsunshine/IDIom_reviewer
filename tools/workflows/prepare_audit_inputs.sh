@@ -2,11 +2,11 @@
 set -euo pipefail
 
 # Edit these paths after downloading the generated FASTAs.
-BASE_IDP="idiom_repo/datasets/idr_datasets/generated_sequences/generated_idps/generated_full.fasta"
-RL_NUC="idiom_repo/datasets/idr_datasets/generated_sequences/generated_protgps/generated_nucleolus/generated_full.fasta"
-RL_CHR="idiom_repo/datasets/idr_datasets/generated_sequences/generated_protgps/generated_chromosome/generated_full.fasta"
-RL_PBD="idiom_repo/datasets/idr_datasets/generated_sequences/generated_protgps/generated_p-body/generated_full.fasta"
-RL_SG="idiom_repo/datasets/idr_datasets/generated_sequences/generated_protgps/generated_stress_granule/generated_full.fasta"
+BASE_IDP="idiom_repo/datasets/idr_datasets/generated_sequences/generated_idps/generated_idrs.fasta"
+RL_NUC="idiom_repo/datasets/idr_datasets/generated_sequences/generated_protgps/generated_nucleolus/generated_idrs.fasta"
+RL_CHR="idiom_repo/datasets/idr_datasets/generated_sequences/generated_protgps/generated_chromosome/generated_idrs.fasta"
+RL_PBD="idiom_repo/datasets/idr_datasets/generated_sequences/generated_protgps/generated_p-body/generated_idrs.fasta"
+RL_SG="idiom_repo/datasets/idr_datasets/generated_sequences/generated_protgps/generated_stress_granule/generated_idrs.fasta"
 
 python -m idiom_audit.cli load-fastas \
   --fasta "$BASE_IDP:base_idp" \
