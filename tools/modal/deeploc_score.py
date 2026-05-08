@@ -225,6 +225,72 @@ def run_deeploc(
     }
 
 
+@app.function(
+    image=image,
+    gpu="L40S",
+    timeout=12 * 60 * 60,
+    volumes={DATA_ROOT: data_volume, DEEPLOC_CACHE: deeploc_volume},
+)
+def run_deeploc_custom_inputs(
+    run_name: str,
+    model: str = "Fast",
+    device: str = "cuda",
+) -> dict:
+    """Run DeepLoc on FASTA files already uploaded to deeploc_custom_inputs/run_name."""
+    install = _ensure_deeploc_cli()
+    root = Path(DATA_ROOT)
+    input_dir = root / "deeploc_custom_inputs" / run_name
+    output_dir = root / "deeploc_outputs" / run_name
+    if not input_dir.exists():
+        raise FileNotFoundError(
+            f"No custom input directory found at {input_dir}. "
+            "Upload FASTAs with: modal volume put idiom-audit-data local_dir "
+            f"deeploc_custom_inputs/{run_name} --force"
+        )
+    fasta_paths = sorted(
+        path
+        for path in input_dir.iterdir()
+        if path.is_file() and path.suffix.lower() in {".fa", ".faa", ".fasta"}
+    )
+    if not fasta_paths:
+        raise FileNotFoundError(f"No FASTA files found in {input_dir}")
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+    outputs = {}
+    for fasta_path in fasta_paths:
+        source = fasta_path.stem
+        source_out = output_dir / source
+        if source_out.exists():
+            shutil.rmtree(source_out)
+        source_out.mkdir(parents=True, exist_ok=True)
+        cmd = ["deeploc2", "-f", str(fasta_path), "-o", str(source_out), "-m", model, "-d", device]
+        proc = subprocess.run(cmd, text=True, capture_output=True)
+        outputs[source] = {
+            "returncode": proc.returncode,
+            "stdout_tail": proc.stdout[-4000:],
+            "stderr_tail": proc.stderr[-4000:],
+            "input_fasta": str(fasta_path.relative_to(root)),
+            "output_dir": str(source_out.relative_to(root)),
+            "files": [str(p.relative_to(source_out)) for p in source_out.rglob("*") if p.is_file()],
+        }
+        if proc.returncode != 0:
+            data_volume.commit()
+            deeploc_volume.commit()
+            raise RuntimeError(f"DeepLoc failed for {source}: {outputs[source]}")
+
+    data_volume.commit()
+    deeploc_volume.commit()
+    return {
+        "run_name": run_name,
+        "model": model,
+        "device": device,
+        "install": install,
+        "inputs": [str(path.relative_to(root)) for path in fasta_paths],
+        "outputs": outputs,
+        "remote_output_dir": str(output_dir.relative_to(root)),
+    }
+
+
 @app.local_entrypoint()
 def main(
     run_name: str = "deeploc_pilot_2k",
@@ -233,9 +299,19 @@ def main(
     model: str = "Fast",
     device: str = "cuda",
     install_smoke: bool = False,
+    custom_inputs: bool = False,
 ):
     if install_smoke:
         print(deeploc_install_smoke.remote())
+        return
+    if custom_inputs:
+        print(
+            run_deeploc_custom_inputs.remote(
+                run_name=run_name,
+                model=model,
+                device=device,
+            )
+        )
         return
     print(
         run_deeploc.remote(
